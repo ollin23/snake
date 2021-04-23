@@ -1,13 +1,6 @@
-# from agents import *
-
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 from pygame.locals import *
 import pygame
 import random
-import sys
-import time
 
 
 # RGB colors
@@ -18,44 +11,45 @@ BLUE = (0, 0, 255)
 WHITE = (255, 255, 255)
 
 # parameters
-WIDTH = 800
+WIDTH = 600
 HEIGHT = 600
 FPS = 15
 SIZE = 20
+grid_x = (WIDTH - SIZE) // SIZE
+grid_y = (HEIGHT - SIZE) // SIZE
 
 
 def initialize():
     pygame.init()
     env = pygame.display.set_mode((WIDTH, HEIGHT))
 
-    snake = [[int(WIDTH / 2), int(HEIGHT / 2)]]
+    snake = [[int(grid_x / 2), int(grid_y / 2)]]
     x_range = (WIDTH - SIZE) // SIZE
     y_range = (HEIGHT- SIZE) // SIZE
-    food = [random.randint(0, x_range) * SIZE, random.randint(0, y_range)*SIZE]
+    food = [random.randint(0, x_range), random.randint(0, y_range)]
 
     return env, snake, food
 
 
-def draw_snake(env, obj, color, size):
-    for x, y in obj:
-        pygame.draw.rect(env, color, [x, y, size, size])
+def draw_snake(env, snake, color):
+    for x, y in snake:
+        pygame.draw.rect(env, color, [x*SIZE, y*SIZE, SIZE, SIZE])
 
 
 def spawn(env, target, snake, respawn=False):
 
     if respawn:
-        x_range = (WIDTH - SIZE) // SIZE
-        y_range = (HEIGHT - SIZE) // SIZE
-        loc = [random.randint(0, x_range) * SIZE, random.randint(0, y_range) * SIZE]
+
+        loc = [random.randint(0, grid_x), random.randint(0, grid_y)]
         while loc in snake:
-            loc = [random.randint(0, x_range) * SIZE, random.randint(0, y_range) * SIZE]
+            loc = [random.randint(0, grid_x), random.randint(0, grid_y)]
 
         return loc
     else:
         # pygame.draw.rect(env, GREEN, [food[0], food[1], SIZE, SIZE])
         pygame.draw.circle(surface=env,
                            color=GREEN,
-                           center=[target[0]+10, target[1]+10],
+                           center=[SIZE*target[0]+10, SIZE*target[1]+10],
                            radius=SIZE//2,
                            width=0)
 
@@ -102,13 +96,23 @@ def display_location(snake):
     print(f"length {len(snake)}; location: {x}, {y}")
 
 
-def play_game(env, food, snake, manual=True):
-    clock = pygame.time.Clock()
+def display_score(env, score):
+    font = pygame.font.SysFont(None, 20)
+    text = font.render(f"Score:  {score}", True, WHITE)
+    env.blit(text, (5, 5))
 
-    score = 1
+
+def play_game(manual=True):
+
+    # initialize game
+    env, snake, food = initialize()
+    clock = pygame.time.Clock()
+    score = 0
     direction = 3
     dx = SIZE
     dy = 0
+    steps = []
+    step = 0
 
     loop = True
     spawn(env, food, snake)
@@ -137,49 +141,36 @@ def play_game(env, food, snake, manual=True):
                 dx, dy = SIZE, 0
             else:
                 pass
+
+        # ai interface
         else:
             pass
 
-
-        # collision detection
-        head = [snake[0][0] + dx, snake[0][1] + dy]
-        chit = detect_collision(head, snake, food)
-        if chit:
-            score += 1
-            food = spawn(env, food, snake, True)
-            snake.insert(0, head)
-        elif chit is not None:
-            loop = False
-            break
-
         # snake movement
+        head = [snake[0][0] + dx, snake[0][1] + dy]
         snake.insert(0, head)
         snake.pop()
+        # collision detection
+        chit = detect_collision(head, snake, food)
+        if chit:
+            score += 50
+            food = spawn(env, food, snake, True)
+            snake.insert(0, head)
+            steps.append(step)
+            step = 0
+        elif chit is None:
+            score -= 1
+            step += 1
+        else:
+            loop = False
+            break
 
         # refresh env
         env.fill(BLACK)
         spawn(env, food, snake)
-        draw_snake(env, snake, RED, SIZE)
+        draw_snake(env, snake, RED)
         clock.tick(FPS)
+        display_score(env, score)
 
-    return score
-
-
-def main():
-    # PARAMETERS
-    scores = []
-    iterations = 1
-
-    # initialize game
-    env, snake, food = initialize()
-
-    for i in range(iterations):
-        score = play_game(env, food, snake)
-        scores.append(score)
-
-    history = pd.DataFrame(data=scores, columns=["scores"])
-    print(history)
-
-
-if __name__ == "__main__":
-    main()
+    avg_steps = sum(steps) / len(steps)
+    return score, avg_steps
